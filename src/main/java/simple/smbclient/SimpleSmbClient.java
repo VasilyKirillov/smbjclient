@@ -49,20 +49,24 @@ public class SimpleSmbClient {
 
     private static SMBJParams getArgsMap(String[] args) {
         SMBJParams params = new SMBJParams();
-        if (args.length != REQUIRED_PARAMS_NUMBER) return params;
+        if (args.length < REQUIRED_PARAMS_NUMBER) return params;
         params.operation = args[0];
-        for (int i = 1; i < args.length; i += 2) {
+        int i = 1;
+        while (i < args.length) {
             String arg = args[i];
             if ("--user".equals(arg) || "-u".equals(arg))
-                params.user = args[i + 1];
+                params.user = args[++i];
             else if ("--host".equals(arg) || "-h".equals(arg))
-                params.host = args[i + 1];
+                params.host = args[++i];
             else if ("--share".equals(arg) || "-s".equals(arg))
-                params.share = args[i + 1];
+                params.share = args[++i];
             else if ("--path".equals(arg) || "-p".equals(arg))
-                params.path = args[i + 1];
+                params.path = args[++i];
             else if ("--file".equals(arg) || "-f".equals(arg))
-                params.file = args[i + 1];
+                params.file = args[++i];
+            else if ("--debug".equals(arg) || "-d".equals(arg))
+                System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "DEBUG");
+            i++;
         }
         return params;
     }
