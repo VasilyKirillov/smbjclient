@@ -13,7 +13,10 @@ import com.hierynomus.smbj.share.DiskShare;
 import com.hierynomus.smbj.utils.SmbFiles;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.EnumSet;
 
 public class SimpleSmbClient {
@@ -26,33 +29,54 @@ public class SimpleSmbClient {
             printUsage();
             return;
         }
-        try {
-            if ("get".equals(params.operation))
-                //TODO
-                System.out.println("not implemented");
-            if ("put".equals(params.operation))
-                writeFileToShare(params);
-        } catch(Exception e) {
+        SMBClient client = new SMBClient();
+
+        try (Connection connection = client.connect(params.host)) {
+            String[] userAndPass = params.user.split(CREDENTIAL_SEPARATOR);
+            AuthenticationContext ac = new AuthenticationContext(userAndPass[0], userAndPass[1].toCharArray(), null);
+            Session session = connection.authenticate(ac);
+
+            try (DiskShare share = (DiskShare) session.connectShare(params.share)) {
+                if ("get".equals(params.operation))
+                    readFileFromSharedFolder(params, share);
+                if ("put".equals(params.operation))
+                    writeFileToShare(params, share);
+            }
+        } catch (Exception e) {
             System.out.println(e.getMessage());
+        }
+    }
+
+    private static void readFileFromSharedFolder(SMBJParams params, DiskShare share) throws IOException {
+        com.hierynomus.smbj.share.File inputFile = share.openFile(
+                params.path,
+                EnumSet.of(AccessMask.GENERIC_READ),
+                EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
+                EnumSet.of(SMB2ShareAccess.FILE_SHARE_READ),
+                SMB2CreateDisposition.FILE_OPEN,
+                EnumSet.noneOf(SMB2CreateOptions.class)
+        );
+        try (final InputStream is = inputFile.getInputStream();
+             final OutputStream os = new FileOutputStream(params.file)) {
+            IOUtil.copy(is, os);
         }
     }
 
     private static void printUsage() {
         System.out.println("smbclient [OPERATION] [OPTIONS]\n\n" +
-                "OPERATION:\n\tget\n\tput\n" +
+                "OPERATION:\n\tget\tretrieve file from shared folder\n\tput\tsend file to shared folder\n" +
                 "OPTIONS:\n\t--user,-u\tusername%password" +
                 "\n\t--host,-h\thost, servername or ip address" +
                 "\n\t--share,-s\tname of shared folder" +
-                "\n\t--path,-p\tdestination path on share" +
-                "\n\t--file,-f\tsource local file");
+                "\n\t--path,-p\tdestination path + filename in shared folder" +
+                "\n\t--file,-f\tsource path to local file");
     }
 
     private static SMBJParams getArgsMap(String[] args) {
         SMBJParams params = new SMBJParams();
         if (args.length < REQUIRED_PARAMS_NUMBER) return params;
         params.operation = args[0];
-        int i = 1;
-        while (i < args.length) {
+        for (int i = 1;i < args.length;i++) {
             String arg = args[i];
             if ("--user".equals(arg) || "-u".equals(arg))
                 params.user = args[++i];
@@ -66,25 +90,14 @@ public class SimpleSmbClient {
                 params.file = args[++i];
             else if ("--debug".equals(arg) || "-d".equals(arg))
                 System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "DEBUG");
-            i++;
         }
         return params;
     }
 
-    private static void writeFileToShare(SMBJParams params) throws IOException {
-        SMBClient client = new SMBClient();
-
-        try (Connection connection = client.connect(params.host)) {
-            String[] userAndPass = params.user.split(CREDENTIAL_SEPARATOR);
-            AuthenticationContext ac = new AuthenticationContext(userAndPass[0], userAndPass[1].toCharArray(), null);
-            Session session = connection.authenticate(ac);
-
-            try (DiskShare share = (DiskShare) session.connectShare(params.share)) {
-                createPathIfNotExists(share, params.path);
-                File source = new File(params.file);
-                SmbFiles.copy(source, share, params.path, Boolean.TRUE);
-            }
-        }
+    private static void writeFileToShare(SMBJParams params, DiskShare share) throws IOException {
+        createPathIfNotExists(share, params.path);
+        File source = new File(params.file);
+        SmbFiles.copy(source, share, params.path, Boolean.TRUE);
     }
 
     private static void createPathIfNotExists(DiskShare share, String path) {
