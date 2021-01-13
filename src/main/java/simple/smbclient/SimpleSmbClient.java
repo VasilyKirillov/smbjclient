@@ -21,7 +21,7 @@ import java.util.EnumSet;
 
 public class SimpleSmbClient {
     private static final int REQUIRED_PARAMS_NUMBER = 11;
-    private static final String CREDENTIAL_SEPARATOR = "%";
+    private static final char CREDENTIAL_SEPARATOR = '%';
 
     public static void main(String[] args) {
         SMBJParams params = getArgsMap(args);
@@ -31,10 +31,7 @@ public class SimpleSmbClient {
         }
         SMBClient client = new SMBClient();
         try (Connection connection = client.connect(params.host)) {
-            String[] userAndPass = params.user.split(CREDENTIAL_SEPARATOR);
-            AuthenticationContext ac = new AuthenticationContext(userAndPass[0], userAndPass[1].toCharArray(), null);
-            Session session = connection.authenticate(ac);
-
+            Session session = getSession(params, connection);
             try (DiskShare share = (DiskShare) session.connectShare(params.share)) {
                 if ("get".equals(params.operation))
                     readFileFromSharedFolder(params, share);
@@ -44,6 +41,14 @@ public class SimpleSmbClient {
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
+    }
+    
+    private static Session getSession(SMBJParams params, Connection connection) {
+        final String userAndPass = params.user;
+        String user = userAndPass.substring(0, userAndPass.indexOf(CREDENTIAL_SEPARATOR));
+        String pass = userAndPass.substring(userAndPass.indexOf(CREDENTIAL_SEPARATOR) + 1);
+        AuthenticationContext ac = new AuthenticationContext(user, pass.toCharArray(), null);
+        return connection.authenticate(ac);
     }
 
     private static void readFileFromSharedFolder(SMBJParams params, DiskShare share) throws IOException {
