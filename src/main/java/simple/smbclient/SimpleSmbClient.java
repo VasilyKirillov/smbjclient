@@ -30,7 +30,6 @@ public class SimpleSmbClient {
             return;
         }
         SMBClient client = new SMBClient();
-
         try (Connection connection = client.connect(params.host)) {
             String[] userAndPass = params.user.split(CREDENTIAL_SEPARATOR);
             AuthenticationContext ac = new AuthenticationContext(userAndPass[0], userAndPass[1].toCharArray(), null);
@@ -105,7 +104,7 @@ public class SimpleSmbClient {
         char forwardSlash = '/';
         if (path.indexOf(backslash) >= 0) {
             createPathIfNotExists(share, path, backslash);
-        } else if (path.indexOf(backslash) >= 0) {
+        } else if (path.indexOf(forwardSlash) >= 0) {
             createPathIfNotExists(share, path, forwardSlash);
         } else {
             createDirIfNotExist(share, path);
